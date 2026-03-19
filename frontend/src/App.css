@@ -1,0 +1,561 @@
+/* ─── App Shell ─────────────────────────────────────────────────────────── */
+.appShell {
+  height: 100vh;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-deep);
+  font-family: 'Inter', sans-serif;
+}
+
+.mapLayer {
+  position: absolute;
+  inset: 0;
+}
+
+/* ─── Panel Cards ────────────────────────────────────────────────────────── */
+.panelCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.panelCard:hover {
+  border-color: rgba(99, 130, 190, 0.28);
+}
+
+/* ─── Panel Header ───────────────────────────────────────────────────────── */
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.panelIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.panelTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* ─── Trip Controls Panel ────────────────────────────────────────────────── */
+.panelRow {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  width: min(380px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ─── Form Controls ──────────────────────────────────────────────────────── */
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 140px;
+  flex: 1;
+}
+
+.label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.control {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 9px 11px;
+  outline: none;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.control:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
+}
+
+.control:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+select.control {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b9dc3' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.button {
+  border-radius: var(--radius-sm);
+  background: var(--accent-blue);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 9px 16px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.button:hover:not(:disabled) {
+  background: #2563eb;
+  box-shadow: 0 0 16px var(--accent-blue-glow);
+  transform: translateY(-1px);
+}
+
+.button:active:not(:disabled) { transform: translateY(0); }
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.buttonSecondary {
+  border-radius: var(--radius-sm);
+  background: rgba(99, 130, 190, 0.1);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  padding: 9px 14px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.buttonSecondary:hover:not(:disabled) {
+  background: rgba(99, 130, 190, 0.18);
+  color: var(--text-primary);
+  border-color: rgba(99, 130, 190, 0.35);
+}
+
+.buttonSecondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.buttonGreen {
+  border-radius: var(--radius-sm);
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  padding: 9px 16px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.buttonGreen:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.25);
+  box-shadow: 0 0 16px var(--accent-green-glow);
+  transform: translateY(-1px);
+}
+
+.buttonGreen:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.buttonRed {
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  padding: 9px 16px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.buttonRed:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  box-shadow: 0 0 16px var(--accent-red-glow);
+}
+
+/* ─── Toggle Switch ──────────────────────────────────────────────────────── */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.switch {
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(6, 11, 22, 0.6);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.switchInner {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--text-muted);
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 2px;
+  transition: left 0.2s ease, background 0.2s ease;
+}
+
+.switchOn {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.switchOn .switchInner {
+  left: 20px;
+  background: var(--accent-green);
+}
+
+.switchButton { cursor: pointer; user-select: none; }
+
+/* ─── KPI Grid ───────────────────────────────────────────────────────────── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.kpi {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: rgba(6, 11, 22, 0.4);
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.kpi:hover { border-color: rgba(99, 130, 190, 0.3); }
+
+.kpiLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.kpiValue {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+/* ─── Mini List ──────────────────────────────────────────────────────────── */
+.miniList { display: grid; gap: 6px; }
+
+.miniItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(6, 11, 22, 0.35);
+  transition: all 0.2s;
+}
+
+.miniItem:hover {
+  background: rgba(13, 20, 38, 0.7);
+  border-color: rgba(99, 130, 190, 0.28);
+}
+
+/* ─── Pills ──────────────────────────────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(6, 11, 22, 0.4);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.colorDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* ─── Status Badge ───────────────────────────────────────────────────────── */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.statusBadge.idle {
+  background: rgba(99, 130, 190, 0.12);
+  color: var(--text-secondary);
+  border: 1px solid rgba(99, 130, 190, 0.2);
+}
+
+.statusBadge.dispatched {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.statusBadge.active {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.statusBadge.warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ─── Pulse dot ──────────────────────────────────────────────────────────── */
+.pulseDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  animation: pulse 2s infinite;
+  flex-shrink: 0;
+}
+
+.pulseDotRed {
+  background: var(--accent-red);
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+  animation: pulseRed 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+@keyframes pulseRed {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* ─── Banner / Toast ─────────────────────────────────────────────────────── */
+.banner {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1100;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: rgba(22, 163, 74, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #86efac;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(34, 197, 94, 0.2);
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ─── Dashboard Card ─────────────────────────────────────────────────────── */
+.dashboardCard {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  width: min(360px, calc(100vw - 32px));
+  z-index: 1000;
+}
+
+/* ─── Divider ────────────────────────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+
+/* ─── Ambulance Status Row ───────────────────────────────────────────────── */
+.ambRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(6, 11, 22, 0.35);
+  border: 1px solid var(--border);
+  margin-bottom: 6px;
+  transition: all 0.2s;
+}
+
+.ambRow:hover { border-color: rgba(99, 130, 190, 0.28); }
+
+.ambIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* ─── Scrollable panel body ──────────────────────────────────────────────── */
+.panelBody {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+/* ─── Loading spinner ────────────────────────────────────────────────────── */
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(99, 130, 190, 0.2);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Fade in ────────────────────────────────────────────────────────────── */
+.fadeIn {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Dispatch Active Glow ───────────────────────────────────────────────── */
+.dispatchGlow {
+  box-shadow: var(--shadow-card), 0 0 24px rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* ─── Progress bar ───────────────────────────────────────────────────────── */
+.progressBar {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(99, 130, 190, 0.15);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-blue), #818cf8);
+  transition: width 0.5s ease;
+}
+
+/* ─── Separator label ────────────────────────────────────────────────────── */
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionLabel::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
