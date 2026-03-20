@@ -8,13 +8,13 @@ const { URL } = require('url')
 
 const { PORT, CORS_ORIGIN } = require('./config/env')
 const { verifyToken } = require('./auth/jwt')
-const { addConnection, removeConnection } = require('./websocket/registry')
+const { addConnection, subscribeToRequest, removeConnection } = require('./websocket/registry')
 
 const authRoutes = require('./routes/authRoutes')
 const userRoutes = require('./routes/userRoutes')
 const sosRoutes = require('./routes/sosRoutes')
 const hospitalRoutes = require('./routes/hospitalRoutes')
-const { getSimSnapshot, setGreenCorridor } = require('./services/sosService')
+const { getSimSnapshot, setGreenCorridor, cancelSosRequest } = require('./services/sosService')
 
 const app = express()
 app.use(helmet())
@@ -71,7 +71,17 @@ wss.on('connection', (ws, req) => {
 
       if (msg?.type === 'SUBSCRIBE' && msg?.payload?.requestId) {
         const snap = getSimSnapshot(msg.payload.requestId)
-        if (snap) ws.send(JSON.stringify({ type: 'TRACKING_SNAPSHOT', payload: snap }))
+        // Register this socket as a subscriber for this requestId.
+        // This works for both authenticated and emergency (unauthenticated) users.
+        subscribeToRequest(msg.payload.requestId, ws)
+        if (userId) addConnection(userId, ws)
+        if (snap) {
+          ws.send(JSON.stringify({ type: 'TRACKING_SNAPSHOT', payload: snap }))
+        }
+      }
+
+      if (msg?.type === 'CANCEL_SOS' && msg?.payload?.requestId) {
+        cancelSosRequest(msg.payload.requestId)
       }
 
       if (msg?.type === 'GREEN_CORRIDOR_TOGGLE' && msg?.payload?.requestId) {
@@ -86,10 +96,10 @@ wss.on('connection', (ws, req) => {
     })
 
     ws.on('close', () => {
-      if (userId) removeConnection(ws)
+      if (ws._userId) removeConnection(ws)
     })
     ws.on('error', () => {
-      if (userId) removeConnection(ws)
+      if (ws._userId) removeConnection(ws)
     })
   } catch {
     ws.close()

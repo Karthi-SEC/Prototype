@@ -103,10 +103,12 @@ export default function DashboardPage() {
 
   const getLocation = () =>
     new Promise((resolve, reject) => {
-      if (!navigator.geolocation) return reject(new Error('Geolocation not supported'))
+      if (!navigator.geolocation) {
+        return reject(new Error('Geolocation not supported'))
+      }
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-        (err) => reject(err),
+        (err) => reject(new Error(err?.message || 'Failed to get location')),
         { enableHighAccuracy: true, timeout: 10000 },
       )
     })
@@ -114,19 +116,38 @@ export default function DashboardPage() {
   const startSosFlow = () => {
     if (dispatching) return
     setError(null)
+
+    if (!navigator.geolocation) {
+      setError('Geolocation not supported in this browser')
+      return
+    }
+
     setDispatching(true)
-    setCountdown(5)
-    const startAt = Date.now()
-    sosTimerRef.current = window.setInterval(() => {
-      const remaining = Math.max(0, 5 - Math.floor((Date.now() - startAt) / 1000))
-      setCountdown(remaining)
-      if (remaining <= 0) {
-        window.clearInterval(sosTimerRef.current)
-        sosTimerRef.current = null
-        setCountdown(null)
-        runDispatch().catch((e) => { setError(e?.message || 'Dispatch failed'); setDispatching(false) })
-      }
-    }, 250)
+
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setCountdown(5)
+        const startAt = Date.now()
+        sosTimerRef.current = window.setInterval(() => {
+          const remaining = Math.max(0, 5 - Math.floor((Date.now() - startAt) / 1000))
+          setCountdown(remaining)
+          if (remaining <= 0) {
+            window.clearInterval(sosTimerRef.current)
+            sosTimerRef.current = null
+            setCountdown(null)
+            runDispatch().catch((e) => {
+              setError(e?.message || 'Dispatch failed')
+              setDispatching(false)
+            })
+          }
+        }, 250)
+      },
+      (err) => {
+        setError(`Location access required for SOS: ${err?.message || 'permission denied'}`)
+        setDispatching(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
   }
 
   const cancelSosFlow = () => {

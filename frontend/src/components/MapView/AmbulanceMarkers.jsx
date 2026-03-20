@@ -27,35 +27,55 @@ export default function AmbulanceMarkers({ ambulances, assignedId }) {
         const isAssigned = a.id === assignedId
         const s = statusStyles(a.status)
         return (
-          <CircleMarker
-            key={a.id}
-            center={[a.position.lat, a.position.lon]}
-            radius={isAssigned ? 11 : 7}
-            pathOptions={{
-              color: s.color,
-              weight: isAssigned ? 3 : 2,
-              fillColor: s.fillColor,
-              fillOpacity: isAssigned ? 0.9 : 0.5,
-            }}
-          >
-            <Tooltip direction="top" offset={[0, -10]} opacity={1} permanent={false}>
-              <div style={{ fontFamily: "'Inter', sans-serif" }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                  <span style={{ fontSize: 14 }}>{statusIcon(a.status)}</span>
-                  <span style={{ fontWeight: 800, fontSize: 13, color: '#f0f4ff' }}>{a.label}</span>
-                </div>
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '2px 8px', borderRadius: 999,
-                  background: `${s.color}20`, border: `1px solid ${s.color}40`,
-                  fontSize: 11, fontWeight: 700, color: s.color,
-                }}>
+          <div key={a.id}>
+            {/* Direction arrow indicator for assigned ambulance */}
+            {isAssigned && a.status !== 'Idle' && (
+              <CircleMarker
+                center={[a.position.lat, a.position.lon]}
+                radius={16}
+                pathOptions={{
+                  color: s.color,
+                  weight: 1,
+                  fillColor: s.color,
+                  fillOpacity: 0.08,
+                }}
+              />
+            )}
+
+            {/* Main ambulance marker */}
+            <CircleMarker
+              center={[a.position.lat, a.position.lon]}
+              radius={isAssigned ? 11 : 7}
+              pathOptions={{
+                color: s.color,
+                weight: isAssigned ? 3 : 2,
+                fillColor: s.fillColor,
+                fillOpacity: isAssigned ? 0.95 : 0.7,
+              }}
+            >
+              <Tooltip direction="top" offset={[0, -10]} opacity={1} permanent={false}>
+                <div style={{ fontFamily: "'Inter', sans-serif" }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    <span style={{ fontSize: 14 }}>{statusIcon(a.status)}</span>
+                    <span style={{ fontWeight: 800, fontSize: 13, color: '#f0f4ff' }}>{a.label}</span>
+                  </div>
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    background: `${s.color}20`,
+                    border: `${s.color}40`,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: s.color,
+                  }}>
                   {a.status || 'Idle'}
                 </div>
               </div>
             </Tooltip>
-          </CircleMarker>
-        )
+          </CircleMarker>          </div>        )
       })}
     </>
   )

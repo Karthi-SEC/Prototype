@@ -77,6 +77,8 @@ export default function DashboardPanel({
   alternatives,
   optimal,
   greenMsg,
+  onDeleteRequest,
+  requestLog,
 }) {
   const t = trafficTheme(trafficSummary)
 
@@ -131,6 +133,29 @@ export default function DashboardPanel({
           </div>
         </div>
 
+        {/* Live Tracking Stats (Delivery app style) */}
+        {dispatchActive && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 10,
+            marginBottom: 14,
+            padding: '12px',
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(59,130,246,0.08) 100%)',
+            border: '1px solid rgba(99,130,190,0.2)',
+          }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>⚡ Speed</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#4ade80', marginTop: 4 }}>~45 km/h</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>📍 Distance</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#60a5fa', marginTop: 4 }}>{distanceKm ? (distanceKm * 0.2).toFixed(1) : '0'}km traveled</div>
+            </div>
+          </div>
+        )}
+
         {/* Assigned ambulance */}
         {dispatchActive && (
           <div style={{
@@ -179,8 +204,13 @@ export default function DashboardPanel({
           </div>
         )}
 
+        <div style={{ fontSize: 12, color: 'var(--text-primary)', marginBottom: 10 }}>
+          <span style={{ fontWeight: 700 }}>Request Status:</span> {dispatchActive ? 'Active' : 'Idle'}
+          {dispatchActive && <span style={{ marginLeft: 8, color: 'var(--accent-green)' }}>• Live tracking</span>}
+        </div>
+
         {/* Legend */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           {[
             { dot: '#22c55e', label: 'Low traffic' },
             { dot: '#f59e0b', label: 'Moderate' },
@@ -196,6 +226,46 @@ export default function DashboardPanel({
               {label}
             </div>
           ))}
+        </div>
+
+        <button
+          onClick={onDeleteRequest}
+          disabled={!dispatchActive && !assignedLabel}
+          style={{
+            width: '100%',
+            marginTop: 8,
+            borderRadius: 10,
+            border: '1px solid rgba(239,68,68,0.35)',
+            background: 'rgba(239,68,68,0.1)',
+            color: '#fca5a5',
+            padding: '10px 12px',
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+          }}
+        >
+          🗑 Delete Request
+        </button>
+        <div style={{ marginTop: 14, borderTop: '1px dashed var(--border)', paddingTop: 10 }}>
+          <h4 style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.4px' }}>
+            Recent Requests
+          </h4>
+          <div style={{ maxHeight: 120, overflowY: 'auto', marginTop: 8 }}>
+            {Array.isArray(requestLog) && requestLog.length > 0 ? (
+              requestLog.slice(-3).reverse().map((r) => (
+                <div key={r.requestId} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, background: 'rgba(6,11,22,0.28)', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)' }}>{r.destination}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.requestId} • {r.startedAt}</div>
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: r.status === 'Arrived' ? '#34d399' : r.status === 'Canceled' ? '#f87171' : '#fbbf24' }}>{r.status}</div>
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>No recent requests yet.</div>
+            )}
+          </div>
         </div>
       </div>
     </>

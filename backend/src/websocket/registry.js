@@ -1,26 +1,48 @@
-const connections = new Map() // userId -> Set<WebSocket>
+const userConnections = new Map()    // userId -> Set<WebSocket>
+const requestSubscribers = new Map() // requestId -> Set<WebSocket>
 
 function addConnection(userId, ws) {
   const key = String(userId)
-  if (!connections.has(key)) connections.set(key, new Set())
-  connections.get(key).add(ws)
+  if (!userConnections.has(key)) userConnections.set(key, new Set())
+  userConnections.get(key).add(ws)
+}
+
+function subscribeToRequest(requestId, ws) {
+  const key = String(requestId)
+  if (!requestSubscribers.has(key)) requestSubscribers.set(key, new Set())
+  requestSubscribers.get(key).add(ws)
+  ws._subscribedRequestId = key
 }
 
 function removeConnection(ws) {
-  for (const [, set] of connections) {
-    if (set.has(ws)) set.delete(ws)
+  for (const [, set] of userConnections) {
+    set.delete(ws)
+  }
+  if (ws._subscribedRequestId) {
+    const set = requestSubscribers.get(ws._subscribedRequestId)
+    if (set) set.delete(ws)
   }
 }
 
 function sendToUser(userId, payload) {
   const key = String(userId)
-  const set = connections.get(key)
-  if (!set) return
+  const set = userConnections.get(key)
   const msg = JSON.stringify(payload)
-  for (const ws of set) {
-    if (ws.readyState === 1) ws.send(msg) // 1 === WebSocket.OPEN
+  if (set) {
+    for (const ws of set) {
+      if (ws.readyState === 1) ws.send(msg)
+    }
   }
 }
 
-module.exports = { addConnection, removeConnection, sendToUser }
+function sendToRequest(requestId, payload) {
+  const key = String(requestId)
+  const set = requestSubscribers.get(key)
+  if (!set) return
+  const msg = JSON.stringify(payload)
+  for (const ws of set) {
+    if (ws.readyState === 1) ws.send(msg)
+  }
+}
 
+module.exports = { addConnection, subscribeToRequest, removeConnection, sendToUser, sendToRequest }

@@ -3,10 +3,11 @@ const { getGraph, getTrafficState, getAmbulances, getNearestNode } = require('./
 const { planRoutes } = require('../sim/routing/routePlanning')
 const { buildMovementPlan, getPositionAtTime } = require('../sim/ambulanceSimulator')
 const { allocateNearestAmbulance } = require('../sim/ambulanceAllocator')
-const { sendToUser } = require('../websocket/registry')
+const { sendToUser, sendToRequest } = require('../websocket/registry')
 const { HOSPITALS } = require('../sim/hospitals')
 
 const activeSims = new Map() // requestId -> sim
+const MAX_ACTIVE_DISPATCHES = 2
 
 function haversineMeters(lat1, lon1, lat2, lon2) {
   const R = 6371000
@@ -56,7 +57,32 @@ function getRouteSnapshot({ graph, route, trafficState }) {
   }
 }
 
+function cancelSosRequest(requestId) {
+  const s = activeSims.get(Number(requestId))
+  if (!s) return false
+
+  for (const t of s.timers) clearInterval(t)
+  activeSims.delete(Number(requestId))
+
+  const amb = getAmbulances().find((a) => a.id === s.assignedAmbulance?.id)
+  if (amb) {
+    amb.status = 'Idle'
+    amb.activeRequestId = null
+  }
+
+  db.prepare("UPDATE emergency_requests SET status = 'Cancelled' WHERE id = ?").run(requestId)
+  sendToRequest(requestId, { type: 'SOS_CANCELLED', payload: { requestId: Number(requestId) } })
+  return true
+}
+
 function startSosSimulation({ requestId, userId, userLat, userLon }) {
+  const activeCount = [...activeSims.values()].filter((s) => s.phase !== 'DONE').length
+  if (activeCount >= MAX_ACTIVE_DISPATCHES) {
+    sendToUser(userId, { type: 'SOS_ERROR', payload: { message: 'All ambulances are currently dispatched. Please wait.' } })
+    db.prepare("UPDATE emergency_requests SET status = 'Rejected' WHERE id = ?").run(requestId)
+    return
+  }
+
   const graph = getGraph()
   const trafficState = getTrafficState()
 
@@ -165,26 +191,7 @@ function startSosSimulation({ requestId, userId, userLat, userLon }) {
   createNotification(userId, `Ambulance dispatched. ETA updating...`)
   notifyEmergencyContacts(userId, `Ambulance dispatched for patient at your contact.`)
 
-  // Send initial snapshot to the user.
-  const latestTraffic = getTrafficState()
-  sendToUser(userId, {
-    type: 'TRACKING_SNAPSHOT',
-    payload: {
-      requestId,
-      phase: sim.phase,
-      hospital: sim.hospital,
-      user: { lat: userLat, lon: userLon },
-      ambulance: {
-        id: assignedAmbulance.id,
-        label: assignedAmbulance.label,
-        position: { ...assignedAmbulance.position },
-        status: assignedAmbulance.status,
-      },
-      etaSeconds: initialRoute.optimal?.totalTimeSeconds ?? null,
-      distanceKm: initialRoute.optimal?.totalDistanceKm ?? null,
-      routeSnapshot: getRouteSnapshot({ graph, route: initialRoute, trafficState: latestTraffic }),
-    },
-  })
+  // (Initial snapshot is sent on SUBSCRIBE, not here, to avoid race with WS connect)
 
   // Recalculate route every 5 seconds (dynamic rerouting).
   const rerouteTimer = setInterval(() => {
@@ -234,7 +241,7 @@ function startSosSimulation({ requestId, userId, userLat, userLon }) {
     s.route = nextRoute.optimal
     s.alternatives = nextRoute.alternatives
 
-    sendToUser(userId, {
+    sendToRequest(requestId, {
       type: 'ROUTE_UPDATE',
       payload: {
         requestId,
@@ -275,7 +282,7 @@ function startSosSimulation({ requestId, userId, userLat, userLon }) {
       }
     }
 
-    sendToUser(userId, {
+    sendToRequest(requestId, {
       type: 'POSITION_UPDATE',
       payload: {
         requestId,
@@ -335,7 +342,7 @@ function startSosSimulation({ requestId, userId, userLat, userLon }) {
           s.movementStartMs = Date.now()
           s.lastMovementPlanStartNodeId = getNearestNode(currentAmb.position.lat, currentAmb.position.lon)
 
-          sendToUser(userId, {
+          sendToRequest(requestId, {
             type: 'ROUTE_UPDATE',
             payload: {
               requestId,
@@ -357,6 +364,8 @@ function startSosSimulation({ requestId, userId, userLat, userLon }) {
         db.prepare('UPDATE emergency_requests SET status = ? WHERE id = ?').run('Completed', requestId)
         createNotification(userId, 'Ambulance arrived at hospital. Transfer assistance provided.')
         notifyEmergencyContacts(userId, 'Ambulance arrived at hospital. Transfer assistance underway.')
+
+        sendToRequest(requestId, { type: 'SOS_COMPLETED', payload: { requestId } })
       }
     }
   }, 250)
@@ -385,17 +394,37 @@ function getSimSnapshot(requestId) {
   if (!sim) return null
   const graph = getGraph()
   const trafficState = getTrafficState()
+
+  // Compute current ambulance position based on elapsed time
+  let currentPosition = { ...sim.assignedAmbulance.position }
+  let currentStatus = sim.assignedAmbulance.status
+  let etaSeconds = null
+  if (sim.movementPlan) {
+    const tSeconds = (Date.now() - sim.movementStartMs) / 1000
+    const pos = getPositionAtTime({ movementPlan: sim.movementPlan, tSeconds, phase: sim.phase })
+    currentPosition = { lat: pos.latLng.lat, lon: pos.latLng.lon }
+    currentStatus = pos.status
+    etaSeconds = Math.max(0, pos.etaSeconds)
+  }
+
   return {
     requestId: sim.requestId,
+    userId: sim.userId,
     phase: sim.phase,
     hospital: sim.hospital,
     user: { lat: sim.userLat, lon: sim.userLon },
+    userDisplay: (() => {
+      const n = getGraph().nodesById[sim.patientGoalNodeId]
+      return n ? { lat: n.lat, lon: n.lon } : { lat: sim.userLat, lon: sim.userLon }
+    })(),
     ambulance: {
       id: sim.assignedAmbulance.id,
       label: sim.assignedAmbulance.label,
-      position: { ...sim.assignedAmbulance.position },
-      status: sim.assignedAmbulance.status,
+      position: currentPosition,
+      status: currentStatus,
     },
+    etaSeconds,
+    distanceKm: sim.route?.totalDistanceKm ?? null,
     routeSnapshot: getRouteSnapshot({
       graph,
       route: { optimal: sim.route, alternatives: sim.alternatives },
@@ -439,7 +468,7 @@ function setGreenCorridor({ requestId, enabled }) {
         })
         s.movementStartMs = Date.now()
 
-        sendToUser(s.userId, {
+        sendToRequest(requestId, {
           type: 'ROUTE_UPDATE',
           payload: {
             requestId,
@@ -457,5 +486,5 @@ function setGreenCorridor({ requestId, enabled }) {
   return true
 }
 
-module.exports = { createSosRequest, getSimSnapshot, setGreenCorridor }
+module.exports = { createSosRequest, getSimSnapshot, setGreenCorridor, cancelSosRequest }
 

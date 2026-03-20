@@ -10,6 +10,7 @@ export default function TripControls({
   dispatchActive,
   onDispatch,
   onActivateGreenCorridor,
+  onCancelDispatch,
   greenCorridorActive,
 }) {
   const idleCount = ambulances.filter((a) => a.status === 'Idle').length
@@ -152,6 +153,20 @@ export default function TripControls({
             <>🟢 Activate Green Corridor</>
           )}
         </button>
+
+        <button
+          className="buttonSecondary"
+          disabled={!dispatchActive}
+          onClick={onCancelDispatch}
+          style={{
+            width: '100%',
+            justifyContent: 'center',
+            padding: '10px 16px',
+            fontSize: 13,
+          }}
+        >
+          🚫 Cancel Dispatch
+        </button>
       </div>
 
       {/* Status hint */}
@@ -162,7 +177,7 @@ export default function TripControls({
       }}>
         {dispatchActive
           ? '⚡ Traffic updates every 3s · Routes recompute every 5s'
-          : '📍 Select destination and dispatch to start real-time optimization'}
+          : '📍 1) Choose a destination 2) Confirm dispatch 3) Watch live ambulance tracking'}
       </div>
     </div>
   )

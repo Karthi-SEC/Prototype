@@ -2,7 +2,7 @@ const express = require('express')
 const { z } = require('zod')
 const { db } = require('../db')
 const { authRequired } = require('../auth/authMiddleware')
-const { createSosRequest } = require('../services/sosService')
+const { createSosRequest, cancelSosRequest } = require('../services/sosService')
 
 const router = express.Router()
 
@@ -61,6 +61,15 @@ router.post('/emergency', (req, res) => {
     console.error('Emergency SOS error:', error)
     return res.status(500).json({ error: 'Failed to create emergency request' })
   }
+})
+
+// Cancel SOS request
+router.delete('/:id/cancel', (req, res) => {
+  const requestId = Number(req.params.id)
+  if (!requestId) return res.status(400).json({ error: 'Invalid request id' })
+  const ok = cancelSosRequest(requestId)
+  if (!ok) return res.status(404).json({ error: 'Request not found or already completed' })
+  return res.json({ cancelled: true })
 })
 
 module.exports = router

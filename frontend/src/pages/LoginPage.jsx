@@ -291,26 +291,13 @@ export default function LoginPage() {
           type="button"
           className="authEmergencyBtn"
           onClick={() => setEmergencyModalOpen(true)}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            backgroundColor: '#dc2626',
-            color: 'white',
-            border: 'none',
-            borderRadius: 'var(--border-radius)',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => (e.target.style.backgroundColor = '#b91c1c')}
-          onMouseLeave={(e) => (e.target.style.backgroundColor = '#dc2626')}
         >
-          🚨 IN EMERGENCY? Call Ambulance Now
+          <span className="authEmergencyIcon">🚨</span>
+          <span className="authEmergencyText">
+            <span className="authEmergencyTitle">IN EMERGENCY?</span>
+            <span className="authEmergencySubtitle">Tap to Call Ambulance Now — No Login Required</span>
+          </span>
+          <span className="authEmergencyArrow">→</span>
         </button>
       </div>
 

@@ -1,10 +1,7 @@
 import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { AuthContext } from '../AppRouter'
-import LeafletMap from '../components/MapView/LeafletMap'
-import RouteLayer from '../components/MapView/RouteLayer'
-import AmbulanceMarkers from '../components/MapView/AmbulanceMarkers'
-import UserLocationMarker from '../components/MapView/UserLocationMarker'
+import GoogleMapView from '../components/MapView/GoogleMapView'
 import { createDemoGraph } from '../ambulanceDemo/graph/roadGraph'
 
 function formatEta(seconds) {
@@ -16,23 +13,14 @@ function formatEta(seconds) {
   return `${m}m ${rem}s`
 }
 
-function routeToRoutesForRender(graph, routeSnapshot) {
-  if (!routeSnapshot?.route) return []
-  const { optimal, alternatives } = routeSnapshot.route
-  const routes = []
-  if (optimal) routes.push({ id: 'optimal', nodes: optimal.routeNodes, edgeKeys: optimal.edgeKeys, isOptimal: true })
-  ;(alternatives ?? []).forEach((alt) => {
-    routes.push({ id: alt.id ?? `alt-${routes.length + 1}`, nodes: alt.routeNodes, edgeKeys: alt.edgeKeys, isOptimal: false })
-  })
-  return routes
-}
 
 function statusTheme(status) {
   const s = String(status || '').toLowerCase()
   if (s === 'dispatched') return { color: '#93c5fd', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.3)', icon: '🚑' }
   if (s === 'on the way') return { color: '#fcd34d', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)', icon: '⚡' }
   if (s === 'arriving') return { color: '#86efac', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.3)', icon: '📍' }
-  if (s === 'arrived') return { color: '#86efac', bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.4)', icon: '✅' }
+  if (s === 'arrived' || s === 'arrived at hospital') return { color: '#86efac', bg: 'rgba(34,197,94,0.15)', border: 'rgba(34,197,94,0.4)', icon: '✅' }
+  if (s === 'cancelled') return { color: '#fca5a5', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', icon: '❌' }
   return { color: '#8b9dc3', bg: 'rgba(99,130,190,0.1)', border: 'rgba(99,130,190,0.2)', icon: '⏳' }
 }
 
@@ -54,6 +42,8 @@ export default function SOSTrackingPage() {
   const [notifications, setNotifications] = useState([])
   const [connected, setConnected] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  const [sosStatus, setSosStatus] = useState('active') // 'active' | 'completed' | 'cancelled'
+  const [cancelling, setCancelling] = useState(false)
   const startRef = useRef(Date.now())
 
   const [greenCorridorEnabled, setGreenCorridorEnabled] = useState(false)
@@ -69,8 +59,6 @@ export default function SOSTrackingPage() {
     return () => clearInterval(id)
   }, [])
 
-  const routesForRender = useMemo(() => routeToRoutesForRender(graph, routeSnapshot), [graph, routeSnapshot])
-  const trafficState = routeSnapshot?.route?.trafficState ?? null
   const optimalRouteNodes = routeSnapshot?.route?.optimal?.routeNodes ?? []
 
   useEffect(() => {
@@ -97,13 +85,25 @@ export default function SOSTrackingPage() {
       if (cancelled) return
       let msg = null
       try { msg = JSON.parse(ev.data) } catch { return }
+      console.log('📡 WebSocket message received:', msg.type, msg.payload)
       if (msg.type === 'SOS_ERROR') setError(msg.payload?.message || 'SOS error')
+      if (msg.type === 'SOS_COMPLETED') {
+        setSosStatus('completed')
+        setPhase('DONE')
+        setAmbulance((prev) => prev ? { ...prev, status: 'Arrived at Hospital' } : prev)
+        setEtaSeconds(0)
+      }
+      if (msg.type === 'SOS_CANCELLED') {
+        setSosStatus('cancelled')
+        setPhase('DONE')
+        setAmbulance((prev) => prev ? { ...prev, status: 'Cancelled' } : prev)
+      }
       if (msg.type === 'EMERGENCY_CONNECTED' || msg.type === 'CONNECTED') {
         // Successfully connected
       }
       if (msg.type === 'TRACKING_SNAPSHOT') {
         const snap = msg.payload
-        setUserPosition(snap.user ?? null)
+        setUserPosition(snap.userDisplay ?? snap.user ?? null)
         setAmbulance(snap.ambulance ? { ...snap.ambulance, position: snap.ambulance.position } : null)
         setEtaSeconds(snap.etaSeconds ?? null)
         setDistanceKm(snap.distanceKm ?? null)
@@ -120,15 +120,27 @@ export default function SOSTrackingPage() {
         }
       }
       if (msg.type === 'POSITION_UPDATE') {
-        setPhase(msg.payload?.phase ?? null)
-        setAmbulance({
-          id: msg.payload.ambulance.id,
-          label: msg.payload.ambulance.label,
-          position: msg.payload.ambulance.position,
-          status: msg.payload.ambulance.status,
+        const payload = msg.payload
+        console.log('📍 POSITION_UPDATE received:', {
+          ambulance: payload.ambulance,
+          etaSeconds: payload.etaSeconds,
+          distanceKm: payload.distanceKm,
+          phase: payload.phase
         })
-        setEtaSeconds(msg.payload.etaSeconds ?? null)
-        setDistanceKm(msg.payload.distanceKm ?? null)
+        setPhase(payload.phase ?? null)
+        const ambulanceData = {
+          id: payload.ambulance?.id,
+          label: payload.ambulance?.label,
+          position: payload.ambulance?.position,
+          status: payload.ambulance?.status,
+        }
+        console.log('🚑 Setting ambulance state:', ambulanceData)
+        setAmbulance(ambulanceData)
+        const eta = payload.etaSeconds ?? null
+        const distance = payload.distanceKm ?? null
+        console.log('⏱ Setting ETA:', eta, 'Distance:', distance)
+        setEtaSeconds(eta)
+        setDistanceKm(distance)
       }
       if (msg.type === 'NOTIFICATION') {
         const m = msg.payload?.message
@@ -142,13 +154,23 @@ export default function SOSTrackingPage() {
 
     return () => {
       cancelled = true
-      try { ws.close() } catch {}
+      try { ws.close() } catch (err) { console.warn('WebSocket close error', err) }
     }
   }, [auth?.token, requestId])
 
   const theme = statusTheme(ambulance?.status)
 
-  const corridorSet = useMemo(() => new Set(corridorEdgeKeys ?? []), [corridorEdgeKeys])
+  const cancelAmbulance = async () => {
+    if (cancelling || sosStatus !== 'active') return
+    setCancelling(true)
+    try {
+      wsRef.current?.send(JSON.stringify({ type: 'CANCEL_SOS', payload: { requestId } }))
+      const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:4000'
+      await fetch(`${apiBase}/api/sos/${requestId}/cancel`, { method: 'DELETE' })
+    } catch (err) {
+      console.warn('Error cancelling SOS:', err)
+    } finally { setCancelling(false) }
+  }
 
   const toggleGreenCorridor = () => {
     if (greenCorridorEnabled) {
@@ -181,17 +203,13 @@ export default function SOSTrackingPage() {
   return (
     <div className="appShell">
       <div className="mapLayer">
-        <LeafletMap graph={graph} routeNodes={optimalRouteNodes}>
-          <RouteLayer
-            graph={graph}
-            routes={routesForRender}
-            trafficState={trafficState ?? {}}
-            greenCorridorActive={greenCorridorEnabled}
-            corridorEdgesSet={corridorSet}
-          />
-          <UserLocationMarker position={userPosition} />
-          {ambulance && <AmbulanceMarkers ambulances={[ambulance]} assignedId={ambulance.id} />}
-        </LeafletMap>
+        <GoogleMapView
+          graph={graph}
+          routeNodes={optimalRouteNodes}
+          userPosition={userPosition}
+          ambulance={ambulance}
+          hospital={hospital}
+        />
       </div>
 
       {/* Tracking Panel */}
@@ -259,8 +277,12 @@ export default function SOSTrackingPage() {
             <div style={{
               padding: '10px 12px',
               borderRadius: 10,
-              background: phase === 'TO_HOSPITAL' ? 'rgba(34,197,94,0.12)' : 'rgba(59,130,246,0.10)',
-              border: phase === 'TO_HOSPITAL' ? '1px solid rgba(34,197,94,0.28)' : '1px solid rgba(59,130,246,0.28)',
+              background: phase === 'DONE'
+                ? (sosStatus === 'cancelled' ? 'rgba(239,68,68,0.10)' : 'rgba(34,197,94,0.12)')
+                : phase === 'TO_HOSPITAL' ? 'rgba(34,197,94,0.12)' : 'rgba(59,130,246,0.10)',
+              border: phase === 'DONE'
+                ? (sosStatus === 'cancelled' ? '1px solid rgba(239,68,68,0.28)' : '1px solid rgba(34,197,94,0.28)')
+                : phase === 'TO_HOSPITAL' ? '1px solid rgba(34,197,94,0.28)' : '1px solid rgba(59,130,246,0.28)',
               marginBottom: 10,
               fontWeight: 800,
               color: 'var(--text-primary)',
@@ -268,10 +290,31 @@ export default function SOSTrackingPage() {
               textTransform: 'uppercase',
               letterSpacing: '0.45px',
             }}>
-              {phase === 'TO_PATIENT' ? 'Heading to patient' : 'Transporting to hospital'}
+              {phase === 'DONE'
+                ? (sosStatus === 'cancelled' ? '🚫 Request Cancelled' : '✅ Arrived at Hospital')
+                : phase === 'TO_PATIENT' ? 'Heading to patient' : 'Transporting to hospital'}
               {phase === 'TO_HOSPITAL' && hospital?.label ? `: ${hospital.label}` : ''}
             </div>
           ) : null}
+
+          {/* Cancel ambulance button */}
+          {sosStatus === 'active' && (
+            <button
+              onClick={cancelAmbulance}
+              disabled={cancelling}
+              style={{
+                width: '100%', padding: '10px 14px', marginBottom: 8,
+                background: cancelling ? 'rgba(239,68,68,0.05)' : 'rgba(239,68,68,0.12)',
+                border: '1.5px solid rgba(239,68,68,0.4)',
+                borderRadius: 'var(--radius-md)', color: '#fca5a5',
+                fontWeight: 700, fontSize: 13, cursor: cancelling ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                transition: 'all 0.2s', opacity: cancelling ? 0.6 : 1,
+              }}
+            >
+              {cancelling ? '⏳ Cancelling...' : '🚫 Cancel Ambulance'}
+            </button>
+          )}
 
           {/* Green corridor control */}
           {(phase === 'TO_PATIENT' || phase === 'TO_HOSPITAL') && auth?.token ? (

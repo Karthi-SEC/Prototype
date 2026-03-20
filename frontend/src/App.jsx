@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import LeafletMap from './components/MapView/LeafletMap'
 import RouteLayer from './components/MapView/RouteLayer'
 import AmbulanceMarkers from './components/MapView/AmbulanceMarkers'
+import AmbulanceTrail from './components/MapView/AmbulanceTrail'
 import DashboardPanel from './components/DashboardPanel/DashboardPanel'
 import TripControls from './components/Controls/TripControls'
 import {
@@ -71,7 +72,10 @@ function App() {
     destinationNodeId: null,
     dispatchedAtMs: 0,
     assignedAmbulanceId: null,
+    requestId: null,
+    statusText: 'No active request',
   })
+  const [requestLog, setRequestLog] = useState([])
   const dispatchRef = useRef(dispatch)
   useEffect(() => {
     dispatchRef.current = dispatch
@@ -111,6 +115,8 @@ function App() {
     if (!assigned) return
 
     const goalNodeId = dispatchSnapshot.destinationNodeId
+    const currentMs = movementRef.current?.startMs || Date.now()
+    const elapsedSeconds = (Date.now() - currentMs) / 1000
     const startNodeId = nearestNodeIdFromLatLng(graph, assigned.position.lat, assigned.position.lon)
 
     const corridorEdgesSet =
@@ -134,16 +140,20 @@ function App() {
       alternativesCount: 3,
     })
 
-    // Reset movement plan to keep ETA accurate after dynamic rerouting.
+    // Keep the movement plan running from current position
     const movementPlan = buildMovementPlan({
       graph,
       routeNodes: full.optimal.routeNodes,
       trafficState: trafficRef.current,
       corridorEdgesSet,
     })
+    
+    // Preserve the original start time so elapsed time continues correctly
+    const currentMovement = movementRef.current
     movementRef.current = {
       movementPlan,
-      startMs: Date.now(),
+      startMs: currentMovement?.startMs || Date.now(),
+      initialized: true,
     }
 
     setRouting((r) => ({
@@ -154,14 +164,6 @@ function App() {
     setDistanceKm(best.totalDistanceKm)
     setEtaSeconds(best.totalTimeSeconds)
     setTrafficSummary(best.trafficLabel)
-
-    setAmbulances((prev) =>
-      prev.map((a) =>
-        a.id === assigned.id
-          ? { ...a, nodeId: startNodeId, status: 'Dispatched' }
-          : a,
-      ),
-    )
   }
 
   const dispatchRequest = () => {
@@ -201,7 +203,11 @@ function App() {
       trafficState: currentTraffic,
       corridorEdgesSet,
     })
-    movementRef.current = { movementPlan, startMs: Date.now() }
+    movementRef.current = {
+      movementPlan,
+      startMs: Date.now(),
+      initialized: true,
+    }
 
     setRouting({
       optimal: full.optimal,
@@ -220,11 +226,26 @@ function App() {
               ...a,
               nodeId: startNodeId,
               status: 'Dispatched',
-              position: { ...graph.nodesById[startNodeId] },
+              position: { lat: graph.nodesById[startNodeId].lat, lon: graph.nodesById[startNodeId].lon },
             }
           : a,
       ),
     )
+
+    const newRequestId = `REQ-${Date.now()}`
+    const dispatchMessage = `Dispatched ${assigned.label} to ${destination.label} · ${full.optimal.totalDistanceKm.toFixed(1)}km · ${Math.round(full.optimal.totalTimeSeconds / 60)}min`
+    setRequestLog((prev) => [
+      ...prev,
+      {
+        requestId: newRequestId,
+        destination: destination.label,
+        ambulance: assigned.label,
+        status: 'On Route',
+        startedAt: new Date().toLocaleTimeString(),
+        distance: full.optimal.totalDistanceKm.toFixed(1),
+        eta: Math.round(full.optimal.totalTimeSeconds / 60),
+      },
+    ])
 
     setDispatch({
       active: true,
@@ -232,6 +253,8 @@ function App() {
       destinationNodeId: goalNodeId,
       dispatchedAtMs: Date.now(),
       assignedAmbulanceId: assignedId,
+      requestId: newRequestId,
+      statusText: 'Ambulance en route',
     })
   }
 
@@ -251,6 +274,79 @@ function App() {
     // Recompute immediately so delay reduction and visuals take effect right away.
     // We keep the corridor edges fixed to those from the optimal route at activation time.
     recomputeRouteNow({ corridorEdgesSetOverride: newCorridorEdgesSet })
+  }
+
+  const cancelDispatch = () => {
+    if (!dispatch.active) return
+
+    setRequestLog((prev) =>
+      prev.map((r) =>
+        r.requestId === dispatch.requestId ? { ...r, status: 'Canceled' } : r,
+      ),
+    )
+    setDispatch({
+      active: false,
+      destinationId: null,
+      destinationNodeId: null,
+      dispatchedAtMs: 0,
+      assignedAmbulanceId: null,
+      requestId: null,
+      statusText: 'Dispatch canceled by operator',
+    })
+    setRouting({
+      optimal: null,
+      alternatives: [],
+      corridorActive: false,
+      corridorEdgesSet: new Set(),
+    })
+    setEtaSeconds(null)
+    setDistanceKm(null)
+    setTrafficSummary('Low')
+    setGreenMsg('Dispatch canceled')
+
+    setAmbulances((prev) =>
+      prev.map((a) =>
+        a.status === 'Dispatched' || a.status === 'Active'
+          ? { ...a, status: 'Idle' }
+          : a,
+      ),
+    )
+
+    window.setTimeout(() => setGreenMsg(null), 3500)
+  }
+
+  const deleteRequest = () => {
+    setRequestLog((prev) =>
+      prev.map((r) =>
+        r.requestId === dispatch.requestId ? { ...r, status: 'Deleted' } : r,
+      ),
+    )
+
+    setDispatch({
+      active: false,
+      destinationId: null,
+      destinationNodeId: null,
+      dispatchedAtMs: 0,
+      assignedAmbulanceId: null,
+      requestId: null,
+      statusText: 'Request deleted',
+    })
+    setRouting({
+      optimal: null,
+      alternatives: [],
+      corridorActive: false,
+      corridorEdgesSet: new Set(),
+    })
+    setEtaSeconds(null)
+    setDistanceKm(null)
+    setTrafficSummary('Low')
+    setGreenMsg('Request deleted successfully')
+
+    setAmbulances((prev) =>
+      prev.map((a) => ({ ...a, status: 'Idle' })),
+    )
+
+    window.setTimeout(() => setGreenMsg(null), 3500)
   }
 
   // Traffic simulation: update congestion every few seconds.
@@ -273,33 +369,43 @@ function App() {
 
   // Ambulance movement simulation (real-time marker updates).
   useEffect(() => {
-    if (!dispatch.active) return
+    if (!dispatch.active || !dispatch.assignedAmbulanceId) return
 
     const id = window.setInterval(() => {
       const movement = movementRef.current
-      if (!movement?.movementPlan) return
+      if (!movement || !movement.movementPlan) return
 
       const tSeconds = (Date.now() - movement.startMs) / 1000
       const pos = getPositionAtTime({ movementPlan: movement.movementPlan, tSeconds })
 
+      if (!pos || !pos.latLng) return
+
       setAmbulances((prev) =>
         prev.map((a) => {
           if (a.id !== dispatch.assignedAmbulanceId) return a
+          const newStatus = pos.arrived ? 'Arrived' : (tSeconds < 1 ? 'Dispatched' : 'On the way')
           return {
             ...a,
             nodeId: pos.nearestNodeId ?? a.nodeId,
-            position: pos.latLng,
-            status: pos.status,
+            position: { lat: pos.latLng.lat, lon: pos.latLng.lon },
+            status: newStatus,
           }
         }),
       )
 
       setEtaSeconds(Math.max(0, pos.etaSeconds))
       if (pos.arrived) {
-        setDispatch((d) => ({ ...d, active: false }))
+        setDispatch((d) => ({
+          ...d,
+          active: false,
+          arrivedAtMs: Date.now(),
+          statusText: 'Ambulance arrived at destination',
+        }))
         movementRef.current = null
+        setGreenMsg('🎉 Ambulance has reached destination')
+        window.setTimeout(() => setGreenMsg(null), 5000)
       }
-    }, 250)
+    }, 200)
 
     return () => window.clearInterval(id)
   }, [dispatch.active, dispatch.assignedAmbulanceId])
@@ -360,13 +466,18 @@ function App() {
       </div>
 
       <div className="mapLayer" style={{ top: 52 }}>
-        <LeafletMap graph={graph} routeNodes={optimalRouteNodes}>
+        <LeafletMap graph={graph} routeNodes={optimalRouteNodes} activeAmbulance={assignedAmbulance}>
           <RouteLayer
             graph={graph}
             routes={routesForRender}
             trafficState={trafficState}
             greenCorridorActive={routing.corridorActive}
             corridorEdgesSet={routing.corridorEdgesSet}
+          />
+          <AmbulanceTrail
+            ambulanceId={assignedAmbulance?.id}
+            ambulancePosition={assignedAmbulance?.position}
+            isActive={dispatch.active}
           />
           <AmbulanceMarkers ambulances={ambulances} assignedId={assignedAmbulance?.id ?? null} />
         </LeafletMap>
@@ -386,6 +497,7 @@ function App() {
           dispatchActive={dispatch.active}
           onDispatch={dispatchRequest}
           onActivateGreenCorridor={activateGreenCorridor}
+          onCancelDispatch={cancelDispatch}
           greenCorridorActive={routing.corridorActive}
         />
       </div>
@@ -400,6 +512,8 @@ function App() {
         alternatives={routing.alternatives}
         optimal={routing.optimal}
         greenMsg={greenMsg}
+        onDeleteRequest={deleteRequest}
+        requestLog={requestLog}
       />
     </div>
   )

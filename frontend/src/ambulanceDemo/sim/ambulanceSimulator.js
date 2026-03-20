@@ -80,7 +80,7 @@ export function getPositionAtTime({ movementPlan, tSeconds }) {
   if (tSeconds >= totalSeconds) {
     return {
       latLng: { ...goalLatLng },
-      status: 'Arriving',
+      status: 'Arrived',
       arrived: true,
       etaSeconds: 0,
       nearestNodeId: goalNodeId,
